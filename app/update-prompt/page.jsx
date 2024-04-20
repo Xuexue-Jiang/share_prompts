@@ -56,6 +56,7 @@ const EditPrompt = () => {
         })
         
         if (response.ok) {
+          queryClient.invalidateQueries({ queryKey: ['prompt'] })
           router.push('/')
         }
         
