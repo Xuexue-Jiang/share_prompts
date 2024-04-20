@@ -2,75 +2,87 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useQuery, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 import Form from '@components/Form'
 
+const queryClient = new QueryClient()
+
 const EditPrompt = () => {
+
   const router = useRouter()
   const [submitting, setSubmitting] = useState(false)
-  const [post, setPost] = useState({
-    prompt: '',
-    tag: '',
-  })
+  
 
-  const searchParams = useSearchParams()
-  const promptId = searchParams.get('id')
+  const fetchPrompt = async (promptId) => {
+    
+    const response = await fetch(`/api/prompt/${promptId}`)
+        const data  = await response.json()
+        return data
+  }
 
-  if(!promptId) return alert('Prompt ID not found')
-
-  useEffect(() => {
-    const getPromptDetails = async () => {
-      const response = await fetch(`/api/prompt/${promptId}`)
-      const data = await response.json()
-      setPost({
-        prompt: data.prompt,
-        tag: data.tag,
-      })
-    }
-
-    if(promptId) getPromptDetails()
-
-  }, [promptId])
-
-
-  const updatePrompt = async (e) => {
-    e.preventDefault()
-    setSubmitting(true)
+  const SearchPrompt = () => {
+  
+    const searchParams = useSearchParams()
+    const [post, setPost] = useState({
+      prompt: '',
+      tag: '',
+    })
+    const promptId = searchParams.get('id')
 
     if(!promptId) return alert('Prompt ID not found')
+    
+    const { data }  = useQuery({ queryKey: ['prompt', promptId],
+    queryFn: () => fetchPrompt(promptId),
+    suspense: true})
 
-    try {
-      const response = await fetch(`api/prompt/${promptId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          prompt: post.prompt,
-          tag: post.tag,
-        })
-      })
-
-      if (response.ok) {
-        router.push('/')
+    useEffect(() => {
+      if (data) {
+        setPost(data);
       }
+    }, [data])
+    
+    const updatePrompt = async (e) => {
+      e.preventDefault()
+      setSubmitting(true)
       
-    } catch (error) {
-      console.log(error)
-
-    } finally {
-      setSubmitting(false)
+      try {
+        const response = await fetch(`api/prompt/${promptId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            prompt: post.prompt,
+            tag: post.tag,
+          })
+        })
+        
+        if (response.ok) {
+          router.push('/')
+        }
+        
+      } catch (error) {
+        console.log(error)
+        
+      } finally {
+        setSubmitting(false)
+      }
     }
+    
+    return <Form 
+    type='Edit'
+    post={post}
+    setPost={setPost}
+    submitting={submitting}
+    handleSubmit={updatePrompt}
+  />
   }
 
   return (
     <div>
-      <Suspense>
-        <Form 
-          type='Edit'
-          post={post}
-          setPost={setPost}
-          submitting={submitting}
-          handleSubmit={updatePrompt}
-        />
-       </Suspense>
+      <QueryClientProvider client={queryClient}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <SearchPrompt />
+        </Suspense>
+      </QueryClientProvider>
     </div>
   )
 }
